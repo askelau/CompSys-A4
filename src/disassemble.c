@@ -54,11 +54,11 @@ static inline int32_t imm_J(uint32_t instruct){
 }
 
 // Write safe formatted string into result buffer
-static void safe_snprintf(char *buf, size_t buf_size, const char *fmt, ...){
+static void safe_snprintf(char *buf, size_t buf_size, const char *format, ...){
     va_list argp;
-    va_start(argp, fmt);
+    va_start(argp, format);
     if (buf_size > 0){
-        vsnprintf(buf, buf_size, fmt, argp);
+        vsnprintf(buf, buf_size, format, argp);
         buf[buf_size - 1] = '\0';
     }
     va_end(argp);
