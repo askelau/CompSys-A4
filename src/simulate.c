@@ -7,8 +7,10 @@
 # include <string.h>
 # include <stdarg.h>
 
+
 // Helper functions for logging events
 static inline void log_reg_write(FILE *log, int rd, uint32_t value){
+    // Log writes
     if (log && rd != 0){
         fprintf(log, " Register write: x%d = 0x%08X\n", rd, value);
     } else {
@@ -17,6 +19,7 @@ static inline void log_reg_write(FILE *log, int rd, uint32_t value){
 }
 
 static inline void log_mem_write(FILE *log, uint32_t addr, uint32_t value){
+    // Log memory writes
     if (log){
         fprintf(log, " Memory write: MEM[0x%08X] = 0x%08X\n", addr, value);
     }
@@ -24,6 +27,7 @@ static inline void log_mem_write(FILE *log, uint32_t addr, uint32_t value){
 
 // Sign-extend helpers
 static inline int32_t sign_extend(uint32_t v, int bits){
+    // Extend n-bit value to 32-bit signed integer
     uint32_t m = 1u << (bits - 1);
     int32_t result = (int32_t)v;
     if (v & m){
@@ -32,17 +36,17 @@ static inline int32_t sign_extend(uint32_t v, int bits){
     return result;
 }
 
-// Immediate extractors
-static inline int32_t imm_I(uint32_t instruct){
+// Immediate extraction helpers
+static inline int32_t imm_I(uint32_t instruct){ // I-type
     return sign_extend(instruct >> 20, 12);
 }
 
-static inline int32_t imm_S(uint32_t instruct){
+static inline int32_t imm_S(uint32_t instruct){ // S-type
     uint32_t imm = ((instruct >> 25) << 5) | ((instruct >> 7) & 0x1f);
     return sign_extend(imm, 12); // 12 bits including sign bit
 }
 
-static inline int32_t imm_B(uint32_t instruct){
+static inline int32_t imm_B(uint32_t instruct){ // B-type
     uint32_t imm = ((instruct >> 31) & 0x1) << 12;
     imm |= (((instruct >> 25) & 0x3f) << 5);
     imm |= (((instruct >> 8) & 0xf) << 1);
@@ -50,11 +54,11 @@ static inline int32_t imm_B(uint32_t instruct){
     return sign_extend(imm, 13); // 13 bits including sign bit
 }
 
-static inline int32_t imm_U(uint32_t instruct){
+static inline int32_t imm_U(uint32_t instruct){ // U-type
     return (int32_t)(instruct & 0xfffff000u);
 }
 
-static inline int32_t imm_J(uint32_t instruct){
+static inline int32_t imm_J(uint32_t instruct){ // J-type
     uint32_t imm = 0;
     imm |= (((instruct >> 31) & 0x1) << 20);
     imm |= (((instruct >> 21) & 0x3ff) << 1);
@@ -63,7 +67,7 @@ static inline int32_t imm_J(uint32_t instruct){
     return sign_extend(imm, 21); // 21 bits including sign bit
 }
 
-// Logging helper
+// Formated logging helper
 static void log_fmt(FILE *log, const char *format, ...){
     if (!log) return;
     va_list argp;
@@ -73,7 +77,8 @@ static void log_fmt(FILE *log, const char *format, ...){
 }
 
 
-// Division helpers
+
+// Division/remainder helpers
 static int32_t div_s(int32_t a, int32_t b){
     if (b == 0){
         return -1;
@@ -108,10 +113,19 @@ static uint32_t rem_u(uint32_t a, uint32_t b){
     }
     return a % b;
 }
-//  Simulator start
+//  RISC-V simulator
 struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file, 
                     struct symbols* symbols){
+
+    // Initialize logging
+    if (log_file) {
+        fprintf(log_file, "Simulator logging enabled\n");
+        fflush(log_file);
+    } else {
+        fprintf(stderr, "Simulator logging disabled\n");
+    }
     
+     // Initialize registers and PC
     uint32_t R[32];
     memset(R, 0, sizeof(R));
     uint32_t PC = (uint32_t)start_addr;
@@ -124,11 +138,11 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
 
     int stop = 0;
     while(!stop){
-        uint32_t instruction = memory_rd_w(mem, PC);
+        uint32_t instruction = memory_rd_w(mem, PC);    // fetch
         uint32_t current_pc = PC;
         instr_count++;
 
-        // Decode
+        // Decodeing standard RISC-V fields
         uint32_t opcode = instruction & 0x7f;
         uint32_t rd = (instruction >> 7) & 0x1f;
         uint32_t funct3 = (instruction >> 12) & 0x7;
@@ -136,7 +150,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
         uint32_t rs2 = (instruction >> 20) & 0x1f;
         uint32_t funct7 = (instruction >> 25) & 0x7f;
 
-        uint32_t next_pc = PC + 4;
+        uint32_t next_pc = PC + 4; // Default PC increment
         int branch_taken = 0;
 
         // Preparing disassembly string if logging
@@ -148,7 +162,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
             disassem_buf[0] = '\0';
         }
 
-        // Execute
+        // Execute instruction
         switch (opcode){
             // R-type
             case 0x33: {
@@ -225,7 +239,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                             R[rd] = (uint32_t)((int32_t)R[rs1] +
                                             (int32_t)R[rs2]);
                             log_reg_write(log_file, rd, R[rd]);
-                        } else if (funct7 == 0x20) {
+                        } else if (funct7 == 0x20) {    // sub
                             R[rd] = (uint32_t)((int32_t)R[rs1] -
                                             (int32_t)R[rs2]);
                             log_reg_write(log_file, rd, R[rd]);
@@ -550,7 +564,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
             log_fmt(log_file, "\n");
         }
 
-        // Advance PV
+        // Advance PC to next instruction
         PC = next_pc;
 
         // Save instr_count in stats periodically
