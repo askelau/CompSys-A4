@@ -64,7 +64,7 @@ static inline int32_t imm_J(uint32_t instruct){
 }
 
 // Logging helper
-static void logf(FILE *log, const char *format, ...){
+static void log_fmt(FILE *log, const char *format, ...){
     if (!log) return;
     va_list argp;
     va_start(argp, format);
@@ -525,7 +525,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                     }
                 } else {
                     // Other system instructions not implemented
-                    fprintf(stderr, "Uhandled system instruction 0x%08x\n", instruction, current_pc);
+                    fprintf(stderr, "Uhandled system instruction 0x%08x at PC=0x%08x\n", instruction, current_pc);
                 }
                 break;
             }
@@ -542,12 +542,12 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
         // Logging per-instruction
         if(log_file){
             // Print instruction count, address, raw instruction, disassembler
-            logf(log_file, "%6ld => %08x : %08x    %s", instr_count, current_pc, instruction, disassem_buf);
+            log_fmt(log_file, "%6ld => %08x : %08x    %s", instr_count, current_pc, instruction, disassem_buf);
             if (branch_taken) {
                 // Log branch is taken
-                logf(log_file, " {T}");
+                log_fmt(log_file, " {T}");
             }
-            logf(log_file, "\n");
+            log_fmt(log_file, "\n");
         }
 
         // Advance PV

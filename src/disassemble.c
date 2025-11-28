@@ -3,6 +3,7 @@
 # include <stdint.h>
 # include <stddef.h>
 # include <string.h>
+#include <stdarg.h>
 
 // Register names from standard RISC-V with ABI-name
 static const char *regname[32] = {
@@ -53,7 +54,7 @@ static inline int32_t imm_J(uint32_t instruct){
     return sign_extend(imm, 21); // 21 bits including sign bit
 }
 
-// Write safe formatted string into result buffer
+/* Write safe formatted string into result buffer
 static void safe_snprintf(char *buf, size_t buf_size, const char *format, ...){
     va_list argp;
     va_start(argp, format);
@@ -62,7 +63,7 @@ static void safe_snprintf(char *buf, size_t buf_size, const char *format, ...){
         buf[buf_size - 1] = '\0';
     }
     va_end(argp);
-}
+}*/
 
 void disassemble(uint32_t addr, uint32_t instruction, char* result,
                 size_t buf_size, struct symbols* symbols){
