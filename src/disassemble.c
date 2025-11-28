@@ -5,6 +5,9 @@
 # include <string.h>
 #include <stdarg.h>
 
+struct symbols;
+const char* symbols_value_to_sym(struct symbols* symbols, unsigned int value);
+
 // Register names from standard RISC-V with ABI-name
 static const char *regname[32] = {
     "zero","ra","sp","gp","tp","t0","t1","t2",
@@ -28,11 +31,13 @@ static inline int32_t imm_I(uint32_t instruct){
     return sign_extend(instruct >> 20, 12);
 }
 
+// S-type
 static inline int32_t imm_S(uint32_t instruct){
     uint32_t imm = ((instruct >> 25) << 5) | ((instruct >> 7) & 0x1f);
     return sign_extend(imm, 12); // 12 bits including sign bit
 }
 
+// B-type
 static inline int32_t imm_B(uint32_t instruct){
     uint32_t imm = ((instruct >> 31) & 0x1) << 12;
     imm |= (((instruct >> 25) & 0x3f) << 5);
@@ -41,10 +46,12 @@ static inline int32_t imm_B(uint32_t instruct){
     return sign_extend(imm, 13); // 13 bits including sign bit
 }
 
+// U-type
 static inline int32_t imm_U(uint32_t instruct){
     return (int32_t)(instruct & 0xfffff000u);
 }
 
+// J-type
 static inline int32_t imm_J(uint32_t instruct){
     uint32_t imm = 0;
     imm |= (((instruct >> 31) & 0x1) << 20);
@@ -54,32 +61,28 @@ static inline int32_t imm_J(uint32_t instruct){
     return sign_extend(imm, 21); // 21 bits including sign bit
 }
 
-/* Write safe formatted string into result buffer
-static void safe_snprintf(char *buf, size_t buf_size, const char *format, ...){
-    va_list argp;
-    va_start(argp, format);
-    if (buf_size > 0){
-        vsnprintf(buf, buf_size, format, argp);
-        buf[buf_size - 1] = '\0';
-    }
-    va_end(argp);
-}*/
-
+// Main disassembler function
 void disassemble(uint32_t addr, uint32_t instruction, char* result,
                 size_t buf_size, struct symbols* symbols){
     
-    (void)symbols;  // Don't really use them
+    // Tempoary buffer
+    char buf[256];
+    buf[0] = '\0';
+    
+     // Append symbol name if this address matches a symbol
+    const char* sym_name = symbols_value_to_sym(symbols, addr);
+    if (sym_name) {
+        size_t len = strlen(buf);
+        snprintf(buf + len, sizeof(buf) - len, " <%s>", sym_name);
+    }
 
+    // Extracting standard RISC-V fields from instruction
     uint32_t opcode = instruction & 0x7f;
     uint32_t rd = (instruction >> 7) & 0x1f;
     uint32_t funct3 = (instruction >> 12) & 0x7;
     uint32_t rs1 = (instruction >> 15) & 0x1f;
     uint32_t rs2 = (instruction >> 20) & 0x1f;
     uint32_t funct7 = (instruction >> 25) & 0x7f;
-
-    // Tempoary buffer
-    char buf[256];
-    buf[0] = '\0';
 
     switch (opcode){
         case 0x33:   // This is an R-Type so add, sub, or, (and others)
