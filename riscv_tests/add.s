@@ -1,0 +1,7 @@
+    .section .text
+    .globl _start
+_start:
+    addi x5, x0, 12
+    addi x6, x0, 8
+    add  x7, x5, x6
+    ecall
