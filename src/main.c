@@ -120,13 +120,63 @@ int main(int argc, char *argv[])
     }
     if (log_file)
     {
-      fprintf(log_file, "\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", num_insns, ticks, mips);
+      fprintf(log_file,
+              "\nSimulated %ld instructions in %d host ticks (%f MIPS)\n",
+              num_insns, ticks, mips);
+
+      // NT
+      if (stats.nt_predictions > 0) {
+        double nt_miss_rate =
+          (double)stats.nt_mispredictions * 100.0 / (double)stats.nt_predictions;
+        fprintf(log_file,
+                "NT predictor: %ld predictions, %ld mispredictions (%.2f%%)\n",
+                stats.nt_predictions, stats.nt_mispredictions, nt_miss_rate);
+      } else {
+        fprintf(log_file,
+                "NT predictor: 0 branch predictions (no conditional branches executed)\n");
+      }
+
+      // BTFNT
+      if (stats.btfnt_predictions > 0) {
+        double btfnt_miss_rate =
+          (double)stats.btfnt_mispredictions * 100.0 / (double)stats.btfnt_predictions;
+        fprintf(log_file,
+                "BTFNT predictor: %ld predictions, %ld mispredictions (%.2f%%)\n",
+                stats.btfnt_predictions, stats.btfnt_mispredictions, btfnt_miss_rate);
+      } else {
+        fprintf(log_file,
+                "BTFNT predictor: 0 branch predictions (no conditional branches executed)\n");
+      }
+
       fclose(log_file);
     }
     else
     {
-      printf("\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", num_insns, ticks, mips);
+      printf("\nSimulated %ld instructions in %d host ticks (%f MIPS)\n",
+            num_insns, ticks, mips);
+
+      // NT
+      if (stats.nt_predictions > 0) {
+        double nt_miss_rate =
+          (double)stats.nt_mispredictions * 100.0 / (double)stats.nt_predictions;
+        printf("NT predictor: %ld predictions, %ld mispredictions (%.2f%%)\n",
+              stats.nt_predictions, stats.nt_mispredictions, nt_miss_rate);
+      } else {
+        printf("NT predictor: 0 branch predictions (no conditional branches executed)\n");
+      }
+
+      // BTFNT
+      if (stats.btfnt_predictions > 0) {
+        double btfnt_miss_rate =
+          (double)stats.btfnt_mispredictions * 100.0 / (double)stats.btfnt_predictions;
+        printf("BTFNT predictor: %ld predictions, %ld mispredictions (%.2f%%)\n",
+              stats.btfnt_predictions, stats.btfnt_mispredictions, btfnt_miss_rate);
+      } else {
+        printf("BTFNT predictor: 0 branch predictions (no conditional branches executed)\n");
+      }
     }
+
+
     memory_delete(mem);
   }
   else {

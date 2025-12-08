@@ -6,7 +6,17 @@
 #include <stdio.h>
 
 // Simuler RISC-V program i givet lager og fra given start adresse
-struct Stat { long int insns; };
+struct Stat {
+    long int insns;
+
+    // NT predictor
+    long int nt_predictions;
+    long int nt_mispredictions;
+
+    // BTFNT predictor
+    long int btfnt_predictions;
+    long int btfnt_mispredictions;
+};
 
 // NOTE: Use of symbols provide for nicer disassembly, but is not required for A4.
 // Feel free to remove this parameter or pass in a NULL pointer and ignore it.

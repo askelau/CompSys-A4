@@ -11,7 +11,12 @@
 // Helper functions for logging events
 static inline void log_reg_write(FILE *log, int rd, uint32_t value){
     // Log writes
-    if (log && rd != 0){
+    if (!log) {
+        // Logging disabled
+        return;
+    }
+
+    if (rd != 0){
         fprintf(log, " Register write: x%d = 0x%08X\n", rd, value);
     } else {
         fprintf(log, " Ignored write to x0\n");
@@ -132,6 +137,12 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     long instr_count = 0;
     struct Stat stats;
     stats.insns = 0;
+
+    stats.nt_predictions = 0;
+    stats.nt_mispredictions = 0;
+
+    stats.btfnt_predictions = 0;
+    stats.btfnt_mispredictions = 0;
 
     // Buffer for disassembly when logging
     char disassem_buf[256];
@@ -439,11 +450,20 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                 break;
             }
 
-            // Branches
+            // Branches 
             case 0x63: {
                 int32_t imm = imm_B(instruction);
                 uint32_t target = (uint32_t)((int32_t)current_pc + imm);
                 int take = 0;
+
+                // NT predictor: always predict NOT TAKEN
+                stats.nt_predictions++;
+
+                // BTFNT predictor: Backward Taken, Forward Not Taken
+                stats.btfnt_predictions++;
+                int btfnt_pred_taken = (target < current_pc);
+
+                // Compute actual branch condition
                 switch (funct3) {
                     case 0x0: { // beq
                         take = ((int32_t)R[rs1] == (int32_t)R[rs2]);
@@ -472,14 +492,24 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                     default:
                         break;
                 }
+
                 if (take) {
                     next_pc = target;
                     branch_taken = 1;
                 }
 
+                if (branch_taken) {
+                    stats.nt_mispredictions++;
+                }
+
+                if (btfnt_pred_taken != branch_taken) {
+                    stats.btfnt_mispredictions++;
+                }
+
                 break;
-                
             }
+
+
 
             // jal
             case 0x6f: {
