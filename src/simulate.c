@@ -7,7 +7,6 @@
 # include <string.h>
 # include <stdarg.h>
 
-
 // Helper functions for logging events
 static inline void log_reg_write(FILE *log, int rd, uint32_t value){
     // Log writes
@@ -118,6 +117,19 @@ static uint32_t rem_u(uint32_t a, uint32_t b){
     }
     return a % b;
 }
+
+
+#define BIMODAL_LEVELS 4
+#define BIMODAL_MAX 16384
+
+static uint8_t bimodal[BIMODAL_LEVELS][BIMODAL_MAX];
+static int bimodal_sizes[BIMODAL_LEVELS] = {256, 1024, 4096, 16384};
+
+#define GSHARE_MAX 16384
+
+static uint8_t gshare[BIMODAL_LEVELS][GSHARE_MAX];
+static uint32_t ghr[BIMODAL_LEVELS];
+
 //  RISC-V simulator
 struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file, 
                     struct symbols* symbols){
@@ -144,9 +156,26 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     stats.btfnt_predictions = 0;
     stats.btfnt_mispredictions = 0;
 
+    for (int i = 0; i < BIMODAL_LEVELS; i++) {
+        for (int j = 0; j < bimodal_sizes[i]; j++) {
+            bimodal[i][j] = 1;
+        }
+        stats.bimodal_predictions[i] = 0;
+        stats.bimodal_mispredictions[i] = 0;
+    }
+
+    for (int i = 0; i < BIMODAL_LEVELS; i++) {
+        for (int j = 0; j < bimodal_sizes[i]; j++) {
+            gshare[i][j] = 1;  // weakly not taken
+        }
+        ghr[i] = 0;
+        stats.gshare_predictions[i] = 0;
+        stats.gshare_mispredictions[i] = 0;
+    }
+
     // Buffer for disassembly when logging
     char disassem_buf[256];
-
+    
     int stop = 0;
     while(!stop){
         uint32_t instruction = memory_rd_w(mem, PC);    // fetch
@@ -456,41 +485,13 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                 uint32_t target = (uint32_t)((int32_t)current_pc + imm);
                 int take = 0;
 
-                // NT predictor: always predict NOT TAKEN
-                stats.nt_predictions++;
-
-                // BTFNT predictor: Backward Taken, Forward Not Taken
-                stats.btfnt_predictions++;
-                int btfnt_pred_taken = (target < current_pc);
-
-                // Compute actual branch condition
                 switch (funct3) {
-                    case 0x0: { // beq
-                        take = ((int32_t)R[rs1] == (int32_t)R[rs2]);
-                        break;
-                    }
-                    case 0x1: { // bne
-                        take = ((int32_t)R[rs1] != (int32_t)R[rs2]);
-                        break;
-                    }
-                    case 0x4: { // blt
-                        take = ((int32_t)R[rs1] < (int32_t)R[rs2]);
-                        break;
-                    }
-                    case 0x5: { // bge
-                        take = ((int32_t)R[rs1] >= (int32_t)R[rs2]);
-                        break;
-                    }
-                    case 0x6: { // bltu
-                        take = (R[rs1] < R[rs2]);
-                        break;
-                    }
-                    case 0x7: { // bgeu
-                        take = (R[rs1] >= R[rs2]);
-                        break;
-                    }
-                    default:
-                        break;
+                    case 0x0: take = ((int32_t)R[rs1] == (int32_t)R[rs2]); break; // beq
+                    case 0x1: take = ((int32_t)R[rs1] != (int32_t)R[rs2]); break; // bne
+                    case 0x4: take = ((int32_t)R[rs1] <  (int32_t)R[rs2]); break; // blt
+                    case 0x5: take = ((int32_t)R[rs1] >= (int32_t)R[rs2]); break; // bge
+                    case 0x6: take = (R[rs1] <  R[rs2]); break;                 // bltu
+                    case 0x7: take = (R[rs1] >= R[rs2]); break;                // bgeu
                 }
 
                 if (take) {
@@ -498,18 +499,47 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                     branch_taken = 1;
                 }
 
-                if (branch_taken) {
+                stats.nt_predictions++;
+                if (take)
                     stats.nt_mispredictions++;
+
+                stats.btfnt_predictions++;
+                int btfnt_pred_taken = (target < current_pc);
+                if (btfnt_pred_taken != take)
+                    stats.btfnt_mispredictions++;
+
+                for (int i = 0; i < BIMODAL_LEVELS; i++) {
+                    int size = bimodal_sizes[i];
+                    int index = (current_pc >> 2) & (size - 1);
+
+                    int pred = (bimodal[i][index] >= 2);
+                    stats.bimodal_predictions[i]++;
+
+                    if (pred != take)
+                        stats.bimodal_mispredictions[i]++;
+
+                    if (take && bimodal[i][index] < 3) bimodal[i][index]++;
+                    if (!take && bimodal[i][index] > 0) bimodal[i][index]--;
                 }
 
-                if (btfnt_pred_taken != branch_taken) {
-                    stats.btfnt_mispredictions++;
+                for (int i = 0; i < BIMODAL_LEVELS; i++) {
+                    int size = bimodal_sizes[i];
+                    int index = ((current_pc >> 2) ^ ghr[i]) & (size - 1);
+
+                    int pred = (gshare[i][index] >= 2);
+                    stats.gshare_predictions[i]++;
+
+                    if (pred != take)
+                        stats.gshare_mispredictions[i]++;
+
+                    if (take && gshare[i][index] < 3) gshare[i][index]++;
+                    if (!take && gshare[i][index] > 0) gshare[i][index]--;
+
+                    ghr[i] = ((ghr[i] << 1) | (take ? 1 : 0)) & (size - 1);
                 }
 
                 break;
             }
-
-
 
             // jal
             case 0x6f: {

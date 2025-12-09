@@ -16,6 +16,12 @@ struct Stat {
     // BTFNT predictor
     long int btfnt_predictions;
     long int btfnt_mispredictions;
+
+    long bimodal_predictions[4];
+    long bimodal_mispredictions[4];
+
+    long gshare_predictions[4];
+    long gshare_mispredictions[4];
 };
 
 // NOTE: Use of symbols provide for nicer disassembly, but is not required for A4.

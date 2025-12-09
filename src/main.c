@@ -174,6 +174,48 @@ int main(int argc, char *argv[])
       } else {
         printf("BTFNT predictor: 0 branch predictions (no conditional branches executed)\n");
       }
+
+      for (int i = 0; i < 4; i++) {
+        int size = (i == 0 ? 256 :
+                    i == 1 ? 1024 :
+                    i == 2 ? 4096 : 16384);
+
+        if (stats.bimodal_predictions[i] > 0) {
+          double miss_rate =
+            (double)stats.bimodal_mispredictions[i] * 100.0 /
+            (double)stats.bimodal_predictions[i];
+
+          printf("Bimodal %d: %ld predictions, %ld mispredictions (%.2f%%)\n",
+                 size,
+                 stats.bimodal_predictions[i],
+                 stats.bimodal_mispredictions[i],
+                 miss_rate);
+        } else {
+          printf("Bimodal %d: 0 branch predictions\n", size);
+        }
+      }
+
+      for (int i = 0; i < 4; i++) {
+        int size = (i == 0 ? 256 :
+                    i == 1 ? 1024 :
+                    i == 2 ? 4096 : 16384);
+
+        if (stats.gshare_predictions[i] > 0) {
+          double miss_rate =
+            (double)stats.gshare_mispredictions[i] * 100.0 /
+            (double)stats.gshare_predictions[i];
+
+          printf("gShare %d: %ld predictions, %ld mispredictions (%.2f%%)\n",
+                 size,
+                 stats.gshare_predictions[i],
+                 stats.gshare_mispredictions[i],
+                 miss_rate);
+        } else {
+          printf("gShare %d: 0 branch predictions\n", size);
+        }
+      }
+
+
     }
 
 
